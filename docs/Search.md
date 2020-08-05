@@ -14,7 +14,7 @@ This API implements the Search specification [documented here](https://www.geona
 ```
 $parameters = [
 	'featureCode' => 'ADM1',  // First-order administrative division
-	'country' => 'ES',        // Countries
+	'country' => 'ZA',        // Countries
 ];
 
 $results = $api->search($parameters);
