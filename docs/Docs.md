@@ -11,7 +11,7 @@ Docs
 
 ## Usage
 
-Instantiating the API
+**Instantiating the API**
 
 ```
 use Bit64\GeoNames\GeoNamesApi;
@@ -24,14 +24,28 @@ $api = new GeoNamesApi($configs);
 
 ```
 
-Changing config at runtime
+**Changing config at runtime**
 
 ```
 $api->lang = 'af';
 $api->charset = 'UTF8';
 ```
 
-Error handling
+**Caching**
+
+The API does not cache results by default, but you can easily enable it by providing the `cacheTtl` option
+```
+// Time to live (in seconds)
+$api->cacheTtl = 604800;
+```
+
+Customise the cache directory
+```
+// mkdir is used recursively to create this path
+$api->cacheDir = 'path/to/dir';
+```
+
+**Error handling**
 
 ```
 // All exceptions in this library extend this base exception
@@ -59,3 +73,5 @@ invalid feature class OOPS
 * __username__ - Your GeoNames API user name, default: `demo`
 * __lang__ - Language for names will target this language where possible, default: `en`
 * __charset__ - Output character encoding, default: `UTF8`
+* __cacheDir__ - Cache directory, default: `NULL`
+* __cacheTtl__ - Cache time-to-live (in seconds), default: `NULL`

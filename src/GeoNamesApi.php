@@ -13,6 +13,8 @@ namespace Bit64\GeoNames;
 use Bit64\GeoNames\Exception\RemoteApiException;
 use GuzzleHttp\Client;
 use Psr\Http\Message\ResponseInterface;
+use Symfony\Component\Cache\Adapter\FilesystemAdapter;
+use Symfony\Contracts\Cache\ItemInterface;
 
 /**
  * @author Warren Heyneke
@@ -21,16 +23,22 @@ class GeoNamesApi {
 
 	protected $api = 'http://api.geonames.org';
 
+	public $cacheDir;
+	public $cacheTtl;
 	public $charset;
 	public $lang;
 	public $username;
 
 	public function __construct(array $configs = []) {
 		@list(
+			$this->cacheDir,
+			$this->cacheTtl,
 			$this->charset,
 			$this->lang,
 			$this->username,
 		) = [
+			$configs['cacheDir'] ?? sprintf('%s/bit64/geonames', sys_get_temp_dir()),
+			$configs['cacheTtl'] ?? null,
 			$configs['charset'] ?? 'UTF8',
 			$configs['lang'] ?? 'en',
 			$configs['username'] ?? 'demo',
@@ -77,18 +85,39 @@ class GeoNamesApi {
 
 	protected function json(string $method, string $uri, array $options = []): array {
 
-		$response = $this->request($method, $uri, $options);
-		$data = @json_decode($response->getBody(), true);
+		$cacheTtl = $options['cacheTtl'] ?? $this->cacheTtl;
+		$cacheDir = $options['cacheDir'] ?? $this->cacheDir;
 
-		if (JSON_ERROR_NONE !== ($code = @json_last_error())) {
-			throw new RemoteApiException($method, $uri, $options, "JSON parse error", $code);
+		unset($options['cacheTtl']);
+		unset($options['cacheDir']);
+
+		$makeRequest = function(string $method, string $uri, array $options = []) {
+
+			$response = $this->request($method, $uri, $options);
+			$data = @json_decode($response->getBody(), true);
+
+			if (JSON_ERROR_NONE !== ($code = @json_last_error())) {
+				throw new RemoteApiException($method, $uri, $options, "JSON parse error", $code);
+			}
+
+			if (1 === count($data) && !empty($msg = $data['status']['message'] ?? null)) {
+				throw new RemoteApiException($method, $uri, $options, $msg, $data['status']['value'] ?? 0, null);
+			}
+
+			return $data;
+
+		};
+
+		if (null !== $cacheTtl && $cacheTtl > 0) {
+			$cachePool = new FilesystemAdapter('', $cacheTtl, $cacheDir);
+			$cacheKey = sha1(json_encode([$method, $uri, $options]));
+			return $cachePool->get($cacheKey, function(ItemInterface $item) use($method, $uri, $options, $makeRequest) {
+				return $makeRequest($method, $uri, $options);
+			});
+		} else {
+			return $makeRequest($method, $uri, $options);
 		}
 
-		if (1 === count($data) && !empty($msg = $data['status']['message'] ?? null)) {
-			throw new RemoteApiException($method, $uri, $options, $msg, $data['status']['value'] ?? 0, null);
-		}
-
-		return $data;
 	}
 
 }
